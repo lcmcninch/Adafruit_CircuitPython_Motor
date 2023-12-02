@@ -47,7 +47,7 @@ class DCMotor:
     """DC motor driver. ``positive_pwm`` and ``negative_pwm`` can be swapped if the motor runs in
     the opposite direction from what was expected for "forwards".
 
-    Motor controller recirculation current decay mode is selectable and defaults to
+    For in/in drivers, recirculation current decay mode is selectable and defaults to
     ``motor.FAST_DECAY`` (coasting). ``motor.SLOW_DECAY`` is recommended to improve spin
     threshold, speed-to-throttle linearity, and PWM frequency sensitivity.
 
@@ -55,11 +55,21 @@ class DCMotor:
     as the DRV8833, DRV8871, and TB6612. Either decay mode setting is compatible
     with discrete h-bridge controller circuitry such as the L9110H and L293D; operational
     performance is not altered.
+    
+    For drivers such as the DRV8256E which use an enable/phase interface, provide the
+    ``positive_pwm`` and ``direction`` parameters, leaving ``negative_pwm`` as ``None``.
+    ``positive_pwm`` is the "enable" PWM signal and ``direction`` is the "phase" signal.
+    
+    If both negative_pwm and direction are provided, a ValueError is raised.
 
     :param ~pwmio.PWMOut positive_pwm: The motor input that causes the motor to spin forwards
       when high and the other is low.
     :param ~pwmio.PWMOut negative_pwm: The motor input that causes the motor to spin backwards
-      when high and the other is low."""
+      when high and the other is low.
+    :param ~digitialio.DigitalInOut direction: The motor input that determines the current
+      direction. Positive throttle settings will set the direction output HIGH and negative
+      will set it LOW
+    """
 
     def __init__(
             self,
