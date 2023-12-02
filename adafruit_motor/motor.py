@@ -21,6 +21,7 @@ factors already.
 """
 
 try:
+    from digitalio import DigitalInOut
     from typing import Optional, Type
     from types import TracebackType
 
@@ -60,9 +61,17 @@ class DCMotor:
     :param ~pwmio.PWMOut negative_pwm: The motor input that causes the motor to spin backwards
       when high and the other is low."""
 
-    def __init__(self, positive_pwm: PWMOut, negative_pwm: PWMOut) -> None:
+    def __init__(
+            self,
+            positive_pwm: PWMOut, 
+            negative_pwm: Optional[PWMOut] = None,
+            direction: Optional[DigitalInOut] = None
+    ) -> None:
+        if negative_pwm is None and direction is None:
+            raise ValueError("Must provide either negative_pwm or direction")
         self._positive = positive_pwm
         self._negative = negative_pwm
+        self._direction = direction
         self._throttle = None
         self._decay_mode = FAST_DECAY
 
@@ -76,9 +85,25 @@ class DCMotor:
 
     @throttle.setter
     def throttle(self, value: Optional[float]) -> None:
+        """Set the driver outputs according to a throttle value
+        
+        The throttle value can range from 1.0 (full forward) to -1.0 (full reverse)
+        
+        If ``None`` or 0.0, the PWM output will be set to 0 and direction
+        will be left as it is. Controllers with the enable/phase interface
+        do not have any braking modes (decay mode is ignored).
+        """
         if value is not None and (value > 1.0 or value < -1.0):
             raise ValueError("Throttle must be None or between -1.0 and +1.0")
         self._throttle = value
+        if self._direction is None:
+            self.__set_throttle_in_in()
+        else:
+            self.__set_throttle_phase_enable()
+
+    def __set_throttle_in_in(self) -> None:
+        """Set the driver outputs for in/in-style drivers"""
+        value = self._throttle
         if value is None:  # Turn off motor controller (high-Z)
             self._positive.duty_cycle = 0
             self._negative.duty_cycle = 0
@@ -101,6 +126,15 @@ class DCMotor:
                 else:
                     self._positive.duty_cycle = duty_cycle
                     self._negative.duty_cycle = 0
+
+    def __set_throttle_phase_enable(self) -> None:
+        """Set the driver outputs for en/ph-style drivers"""
+        value = self._throttle
+        if not value:  # Turn off motor controller (high-Z)
+            self._positive.duty_cycle = 0
+        else:
+            self._positive.duty_cycle = int(0xFFFF * abs(value))
+            self._direction.value = value > 0  # Direction pin high is forward
 
     @property
     def decay_mode(self) -> int:
